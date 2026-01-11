@@ -1,0 +1,28 @@
+# Object files
+*.o
+*.obj
+
+# Libraries
+*.a
+*.lib
+
+# Executables
+example
+*.exe
+*.out
+
+# Build artifacts
+*.so
+*.dylib
+*.dll
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
