@@ -7,6 +7,10 @@
 #include <math.h>
 #include <string.h>
 
+/* Numerical thresholds */
+#define EPSILON_SMALL 1e-10   /* For near-zero checks */
+#define EPSILON_PARALLEL 1e-6 /* For parallel vector detection */
+
 /* ============================================================================
  * Quaternion Operations
  * ============================================================================ */
@@ -22,7 +26,7 @@ Quaternion quaternion_create(double w, double x, double y, double z) {
 
 Quaternion quaternion_normalize(Quaternion q) {
     double norm = sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
-    if (norm < 1e-10) {
+    if (norm < EPSILON_SMALL) {
         /* Return identity quaternion if norm is too small */
         return quaternion_create(1.0, 0.0, 0.0, 0.0);
     }
@@ -53,7 +57,7 @@ Quaternion quaternion_conjugate(Quaternion q) {
 
 Quaternion quaternion_inverse(Quaternion q) {
     double norm_sq = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
-    if (norm_sq < 1e-10) {
+    if (norm_sq < EPSILON_SMALL) {
         /* Return identity quaternion if norm is too small */
         return quaternion_create(1.0, 0.0, 0.0, 0.0);
     }
@@ -247,7 +251,7 @@ EulerAngles rotation_matrix_to_euler(RotationMatrix R) {
     if (sin_pitch < -1.0) sin_pitch = -1.0;
     e.pitch = asin(sin_pitch);
     
-    if (fabs(cos(e.pitch)) > 1e-6) {
+    if (fabs(cos(e.pitch)) > EPSILON_PARALLEL) {
         e.roll = atan2(R.m[2][1], R.m[2][2]);
         e.yaw = atan2(R.m[1][0], R.m[0][0]);
     } else {
@@ -350,7 +354,7 @@ double vector3_norm(Vector3 v) {
 
 Vector3 vector3_normalize(Vector3 v) {
     double norm = vector3_norm(v);
-    if (norm < 1e-10) {
+    if (norm < EPSILON_SMALL) {
         /* Return unit z-axis as default for consistency with geometric controller */
         return vector3_create(0.0, 0.0, 1.0);
     }
@@ -510,7 +514,7 @@ ControlCommand geometric_controller_compute(
     
     /* Check if z_des and x_c are nearly parallel/anti-parallel */
     Vector3 y_des_temp = vector3_cross(z_des, x_c);
-    if (vector3_norm(y_des_temp) < 1e-6) {
+    if (vector3_norm(y_des_temp) < EPSILON_PARALLEL) {
         /* If parallel, use alternative reference vector */
         x_c = vector3_create(0.0, 1.0, 0.0);  /* Use north as backup */
         y_des_temp = vector3_cross(z_des, x_c);
