@@ -532,11 +532,12 @@ ControlCommand geometric_controller_compute(
     RotationMatrix eR_matrix1 = rotation_matrix_multiply(R_des_T, R);
     RotationMatrix eR_matrix2 = rotation_matrix_multiply(R_T, R_des);
     
-    /* Extract rotation error vector from skew-symmetric matrix */
+    /* Extract rotation error vector from skew-symmetric matrix (eR_matrix1 - eR_matrix2) */
+    /* The skew-symmetric matrix has the form: [0, -z, y; z, 0, -x; -y, x, 0] */
     Vector3 eR;
-    eR.x = 0.5 * (eR_matrix1.m[2][1] - eR_matrix2.m[2][1]);
-    eR.y = 0.5 * (eR_matrix1.m[0][2] - eR_matrix2.m[0][2]);
-    eR.z = 0.5 * (eR_matrix1.m[1][0] - eR_matrix2.m[1][0]);
+    eR.x = 0.5 * ((eR_matrix1.m[2][1] - eR_matrix1.m[1][2]) - (eR_matrix2.m[2][1] - eR_matrix2.m[1][2]));
+    eR.y = 0.5 * ((eR_matrix1.m[0][2] - eR_matrix1.m[2][0]) - (eR_matrix2.m[0][2] - eR_matrix2.m[2][0]));
+    eR.z = 0.5 * ((eR_matrix1.m[1][0] - eR_matrix1.m[0][1]) - (eR_matrix2.m[1][0] - eR_matrix2.m[0][1]));
     
     /* Angular velocity error (assuming zero desired angular velocity) */
     Vector3 eOmega = state.angular_vel;
