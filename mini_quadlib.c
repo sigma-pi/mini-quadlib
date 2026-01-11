@@ -392,9 +392,10 @@ RotationMatrix get_frame_conversion_matrix(FrameType from_frame, FrameType to_fr
             R_from_to_enu.m[2][0] = 0.0; R_from_to_enu.m[2][1] = 0.0; R_from_to_enu.m[2][2] = 1.0;
             break;
         case FRAME_FLU:
-            /* FLU (body-fixed) to ENU: depends on orientation, here we assume aligned */
-            /* x_enu = x_flu, y_enu = y_flu, z_enu = z_flu */
-            /* This is a placeholder - in practice FLU is body-fixed and needs attitude */
+            /* FLU (body-fixed, Forward-Left-Up) to ENU: depends on vehicle orientation */
+            /* NOTE: FLU is body-fixed and requires attitude information for proper conversion.
+             * This assumes the body is aligned with ENU (zero attitude) as a placeholder.
+             * For proper FLU conversions, use the rotation matrix from the vehicle's attitude. */
             break;
         case FRAME_FRD:
             /* FRD to ENU: x_enu = x_frd, y_enu = -y_frd, z_enu = -z_frd */
@@ -424,7 +425,10 @@ RotationMatrix get_frame_conversion_matrix(FrameType from_frame, FrameType to_fr
             R_enu_to_target.m[2][0] = 0.0; R_enu_to_target.m[2][1] = 0.0; R_enu_to_target.m[2][2] = 1.0;
             break;
         case FRAME_FLU:
-            /* ENU to FLU: placeholder, assumes alignment */
+            /* ENU to FLU (body-fixed, Forward-Left-Up): depends on vehicle orientation */
+            /* NOTE: FLU is body-fixed and requires attitude information for proper conversion.
+             * This assumes the body is aligned with ENU (zero attitude) as a placeholder.
+             * For proper FLU conversions, use the rotation matrix from the vehicle's attitude. */
             break;
         case FRAME_FRD:
             /* ENU to FRD: inverse of FRD to ENU */
@@ -475,15 +479,15 @@ ControlCommand geometric_controller_compute(
     ControlCommand cmd;
     
     /* Position error */
-    Vector3 pos_error = vector3_subtract(state.position, desired_pos);
+    Vector3 pos_error = vector3_subtract(desired_pos, state.position);
     
     /* Velocity error */
-    Vector3 vel_error = vector3_subtract(state.velocity, desired_vel);
+    Vector3 vel_error = vector3_subtract(desired_vel, state.velocity);
     
     /* Desired acceleration with PD control */
     Vector3 acc_des = desired_acc;
-    acc_des = vector3_subtract(acc_des, vector3_scale(pos_error, gains.kx));
-    acc_des = vector3_subtract(acc_des, vector3_scale(vel_error, gains.kv));
+    acc_des = vector3_add(acc_des, vector3_scale(pos_error, gains.kx));
+    acc_des = vector3_add(acc_des, vector3_scale(vel_error, gains.kv));
     
     /* Gravity compensation */
     Vector3 gravity_vec = vector3_create(0.0, 0.0, gains.gravity);
