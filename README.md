@@ -23,6 +23,11 @@ make
 make run
 ```
 
+### Run the test suite:
+```bash
+make runtests
+```
+
 ### Clean build artifacts:
 ```bash
 make clean
@@ -130,9 +135,27 @@ mini-quadlib/
 ├── mini_quadlib.h      # Main header file with all declarations
 ├── mini_quadlib.c      # Implementation of all functions
 ├── example.c           # Example usage program
+├── test.c              # Test suite
 ├── Makefile            # Build system
 └── README.md           # This file
 ```
+
+## Testing
+
+The library includes a comprehensive test suite that validates:
+- Quaternion operations and conversions
+- Euler angle conversions
+- Rotation matrix operations
+- Vector operations
+- Frame conversions
+- Geometric controller behavior
+
+Run the test suite with:
+```bash
+make runtests
+```
+
+All tests should pass with zero failures.
 
 ## Coordinate Frames
 

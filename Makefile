@@ -9,14 +9,17 @@ LIB_SRC = mini_quadlib.c
 LIB_OBJ = $(LIB_SRC:.c=.o)
 EXAMPLE_SRC = example.c
 EXAMPLE_OBJ = $(EXAMPLE_SRC:.c=.o)
+TEST_SRC = test.c
+TEST_OBJ = $(TEST_SRC:.c=.o)
 
 # Output files
 LIB = libmini_quadlib.a
 EXAMPLE = example
+TEST = test
 
-.PHONY: all clean run
+.PHONY: all clean run runtests
 
-all: $(LIB) $(EXAMPLE)
+all: $(LIB) $(EXAMPLE) $(TEST)
 
 # Build static library
 $(LIB): $(LIB_OBJ)
@@ -28,6 +31,11 @@ $(EXAMPLE): $(EXAMPLE_OBJ) $(LIB)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	@echo "Example built: $@"
 
+# Build test program
+$(TEST): $(TEST_OBJ) $(LIB)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "Test built: $@"
+
 # Compile object files
 %.o: %.c mini_quadlib.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -36,8 +44,12 @@ $(EXAMPLE): $(EXAMPLE_OBJ) $(LIB)
 run: $(EXAMPLE)
 	./$(EXAMPLE)
 
+# Run the tests
+runtests: $(TEST)
+	./$(TEST)
+
 clean:
-	rm -f $(LIB_OBJ) $(EXAMPLE_OBJ) $(LIB) $(EXAMPLE)
+	rm -f $(LIB_OBJ) $(EXAMPLE_OBJ) $(TEST_OBJ) $(LIB) $(EXAMPLE) $(TEST)
 	@echo "Cleaned build artifacts"
 
 # Install header (optional)
