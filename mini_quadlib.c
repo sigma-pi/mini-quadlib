@@ -53,6 +53,10 @@ Quaternion quaternion_conjugate(Quaternion q) {
 
 Quaternion quaternion_inverse(Quaternion q) {
     double norm_sq = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+    if (norm_sq < 1e-10) {
+        /* Return identity quaternion if norm is too small */
+        return quaternion_create(1.0, 0.0, 0.0, 0.0);
+    }
     Quaternion conj = quaternion_conjugate(q);
     conj.w /= norm_sq;
     conj.x /= norm_sq;
@@ -237,7 +241,11 @@ EulerAngles rotation_matrix_to_euler(RotationMatrix R) {
     EulerAngles e;
     
     /* ZYX convention */
-    e.pitch = asin(-R.m[2][0]);
+    /* Clamp R.m[2][0] to [-1, 1] to handle numerical errors */
+    double sin_pitch = -R.m[2][0];
+    if (sin_pitch > 1.0) sin_pitch = 1.0;
+    if (sin_pitch < -1.0) sin_pitch = -1.0;
+    e.pitch = asin(sin_pitch);
     
     if (fabs(cos(e.pitch)) > 1e-6) {
         e.roll = atan2(R.m[2][1], R.m[2][2]);
@@ -343,7 +351,8 @@ double vector3_norm(Vector3 v) {
 Vector3 vector3_normalize(Vector3 v) {
     double norm = vector3_norm(v);
     if (norm < 1e-10) {
-        return vector3_create(0.0, 0.0, 0.0);
+        /* Return unit z-axis as default for consistency with geometric controller */
+        return vector3_create(0.0, 0.0, 1.0);
     }
     return vector3_scale(v, 1.0 / norm);
 }
@@ -494,7 +503,16 @@ ControlCommand geometric_controller_compute(
     
     /* Desired x-axis based on desired yaw */
     Vector3 x_c = vector3_create(cos(desired_yaw), sin(desired_yaw), 0.0);
-    Vector3 y_des = vector3_normalize(vector3_cross(z_des, x_c));
+    
+    /* Check if z_des and x_c are nearly parallel/anti-parallel */
+    Vector3 y_des_temp = vector3_cross(z_des, x_c);
+    if (vector3_norm(y_des_temp) < 1e-6) {
+        /* If parallel, use alternative reference vector */
+        x_c = vector3_create(0.0, 1.0, 0.0);  /* Use north as backup */
+        y_des_temp = vector3_cross(z_des, x_c);
+    }
+    
+    Vector3 y_des = vector3_normalize(y_des_temp);
     Vector3 x_des = vector3_cross(y_des, z_des);
     
     /* Desired rotation matrix */

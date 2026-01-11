@@ -20,7 +20,7 @@ make
 
 ### Run the example program:
 ```bash
-make example
+make run
 ```
 
 ### Clean build artifacts:
