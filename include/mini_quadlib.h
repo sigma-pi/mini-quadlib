@@ -22,7 +22,7 @@ extern "C" {
  * @file mini_quadlib.h
  * @brief Mini-QuadLib - Simple quadrotor control library
  * @author Chengyu Yang
- * @version 0.1.0
+ * @version 0.1.1
  * @date 2026
  * 
  * This library provides the geometric controller for quadrotor control,
@@ -33,7 +33,7 @@ extern "C" {
 // VERSION INFO
 // =============================================================================
 
-#define QUADLIB_VERSION_STRING "0.1.0"
+#define QUADLIB_VERSION_STRING "0.1.1"
 
 /*
 Return the version string of the mini-quadlib library as char* ended with '\0'.
@@ -137,71 +137,102 @@ typedef struct {
 /*
 State of the quadrotor:
 {
-vector3f_t position
-vector3f_t velocity
-quaternion4f_t attitude
-vector3f_t angular_velocity
+vector3f_t pos
+vector3f_t vel
+quaternion4f_t quat
+vector3f_t omega
 }
 */
 typedef struct {
-    vector3f_t position;
-    vector3f_t velocity;
-    quaternion4f_t attitude;
-    vector3f_t angular_velocity;
+    vector3f_t pos;
+    vector3f_t vel;
+    quaternion4f_t quat;
+    vector3f_t omega;
 } state_t;
 
 /*
 Desired setpoint from planner:
 {
-vector3f_t position
-vector3f_t velocity
-vector3f_t acceleration
+vector3f_t pos
+vector3f_t vel
+vector3f_t acc
 vector3f_t jerk
 vector3f_t snap
 float yaw
-float yaw_rate
-float yaw_acceleration
+float yaw_dot
+float yaw_ddot
 }
 */
 typedef struct {
-    vector3f_t position;
-    vector3f_t velocity;
-    vector3f_t acceleration;
+    vector3f_t pos;
+    vector3f_t vel;
+    vector3f_t acc;
     vector3f_t jerk;
     vector3f_t snap;
     float yaw;
-    float yaw_rate;
-    float yaw_acceleration;
+    float yaw_dot;
+    float yaw_ddot;
 } setpoint_t;
 
 /*
 Controller parameters for geometric controller:
 {
-vector3f_t k_position
-vector3f_t k_velocity
-vector3f_t k_attitude
-vector3f_t k_angular_velocity
+vector3f_t k_p
+vector3f_t k_v
+vector3f_t k_R
+vector3f_t k_O
 }
 */
 typedef struct {
-    vector3f_t k_position;             // Position gains, x y z
-    vector3f_t k_velocity;             // Velocity gains, x y z
-    vector3f_t k_attitude;             // Attitude gains, x y z
-    vector3f_t k_angular_velocity;     // Angular velocity gains, x y z
+    vector3f_t k_p;             // Position gains, x y z
+    vector3f_t k_v;             // Velocity gains, x y z
+    vector3f_t k_R;             // Attitude gains, x y z
+    vector3f_t k_O;             // Angular velocity gains, x y z
 } geometric_params_t;
+
+/*
+Parameters for quadrotor in "X" configuration:
+{
+vector3f_t inertia
+float mass
+float xlen
+float ylen
+float k_thrust
+float k_drag
+}
+NED frame: X points up, Y points right, Z points into the plane
+       X
+       ^
+3(CW)    1(CCW)
+    \    /
+     \/\/
+     |__|      >Y
+    /    \
+   /      \
+2(CCW)   4(CW)
+*/
+typedef struct {
+    vector3f_t inertia;   // inertia around body frame axes [kg*m^2]
+    float mass;           // mass of the drone [kg]
+    float xlen;           // distance between motors on x axis [m]
+    float ylen;           // distance between motors on y axis [m]
+    float k_thrust;       // thrust coefficient [N/(rad/s)^2]
+    float k_drag;         // drag (torque) coefficient [Nm/(rad/s)^2]
+} quadx_params_t;
 
 // =============================================================================
 // CORE CONTROLLER FUNCTIONS: GEOMETRIC CONTROLLER
 // =============================================================================
 
 /**
- * @brief Geometric controller for quadrotor, repquiring full parameter list
+ * @brief Geometric controller for quadrotor (NED), repquiring full parameter list
  * 
  * @param output_control_TM Pointer to store the output control (thrust and moments)
  * @param current_state Pointer to the current state of the quadrotor
  * @param desired_state Pointer to the desired setpoint state
  * @param dt Time step since last control update [s]
- * @param params Pointer to the geometric controller parameters 
+ * @param ctrl_params Pointer to the geometric controller parameters 
+ * @param quad_params Pointer to the quadrotor physical parameters
  * 
  * @return An enum type (quadlib_result_t) result of the controller computation, showing success or error code
  * 
@@ -216,11 +247,11 @@ typedef struct {
  *                                                     &params));
  * @endcode
  */
-// quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_TM,
-//                                                     const state_t* current_state,
-//                                                     const setpoint_t* desired_state,
-//                                                     float dt,
-//                                                     const geometric_params_t* params);
+quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_TM,
+                                                    const state_t* current_state,
+                                                    const setpoint_t* desired_state,
+                                                    const geometric_params_t* ctrl_params,
+                                                    const quadx_params_t* quad_params);
 
 // =============================================================================
 // UTILITY FUNCTIONS: ROBOTICS TOOLS
@@ -591,6 +622,32 @@ quadlib_result_t vector3_wedge(matrix3f_t* output_matrix, const vector3f_t* v);
  * @note You can use macro QUADLIB_CHECK() to check the returned status.
  */
 quadlib_result_t matrix3_is_equalf(bool* is_equal, matrix3f_t* a, const matrix3f_t* b);
+
+/**
+ * @brief Compute the subtraction of two 3x3 matrices: output_dot = a - b
+ * 
+ * @param output_dot Pointer to store the output subtraction result as a 3x3 matrix
+ * @param a Pointer to the first input matrix
+ * @param b Pointer to the second input matrix
+ * 
+ * @return An enum type (quadlib_result_t) result of the controller computation, showing success or error code
+ * 
+ * @note You can use macro QUADLIB_CHECK() to check the returned status.
+ */
+quadlib_result_t matrix3_sub(matrix3f_t* output_dot, const matrix3f_t* a, const matrix3f_t* b);
+
+/**
+ * @brief Compute the addition of two 3x3 matrices: output_dot = a + b
+ * 
+ * @param output_dot Pointer to store the output addition result as a 3x3 matrix
+ * @param a Pointer to the first input matrix
+ * @param b Pointer to the second input matrix
+ * 
+ * @return An enum type (quadlib_result_t) result of the controller computation, showing success or error code
+ * 
+ * @note You can use macro QUADLIB_CHECK() to check the returned status.
+ */
+quadlib_result_t matrix3_add(matrix3f_t* output_dot, const matrix3f_t* a, const matrix3f_t* b);
 
 /**
  * @brief Compute the dot product of two 3x3 matrices

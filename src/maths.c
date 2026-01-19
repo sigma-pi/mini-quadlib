@@ -131,6 +131,40 @@ quadlib_result_t matrix3_is_equalf(bool* is_equal, matrix3f_t* a, const matrix3f
     return QUADLIB_SUCCESS;
 }
 
+quadlib_result_t matrix3_sub(matrix3f_t* output_dot, const matrix3f_t* a, const matrix3f_t* b)
+{
+    output_dot->colx.x = a->colx.x - b->colx.x;
+    output_dot->colx.y = a->colx.y - b->colx.y;
+    output_dot->colx.z = a->colx.z - b->colx.z;
+
+    output_dot->coly.x = a->coly.x - b->coly.x;
+    output_dot->coly.y = a->coly.y - b->coly.y;
+    output_dot->coly.z = a->coly.z - b->coly.z;
+
+    output_dot->colz.x = a->colz.x - b->colz.x;
+    output_dot->colz.y = a->colz.y - b->colz.y;
+    output_dot->colz.z = a->colz.z - b->colz.z;
+
+    return QUADLIB_SUCCESS;
+}
+
+quadlib_result_t matrix3_add(matrix3f_t* output_dot, const matrix3f_t* a, const matrix3f_t* b)
+{
+    output_dot->colx.x = a->colx.x + b->colx.x;
+    output_dot->colx.y = a->colx.y + b->colx.y;
+    output_dot->colx.z = a->colx.z + b->colx.z;
+
+    output_dot->coly.x = a->coly.x + b->coly.x;
+    output_dot->coly.y = a->coly.y + b->coly.y;
+    output_dot->coly.z = a->coly.z + b->coly.z;
+
+    output_dot->colz.x = a->colz.x + b->colz.x;
+    output_dot->colz.y = a->colz.y + b->colz.y;
+    output_dot->colz.z = a->colz.z + b->colz.z;
+
+    return QUADLIB_SUCCESS;
+}
+
 quadlib_result_t matrix3_dot(matrix3f_t* output_dot, const matrix3f_t* a, const matrix3f_t* b)
 {
     output_dot->colx.x = a->colx.x * b->colx.x + a->coly.x * b->colx.y + a->colz.x * b->colx.z;
