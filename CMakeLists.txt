@@ -3,7 +3,8 @@ project(mini_quadlib VERSION 1.0.0 LANGUAGES C)
 
 # Build static library
 add_library(mini_quadlib STATIC
-    src/geometric_controller.c
+    src/geometric_control.c
+    src/l1_adaptive_control.c
     src/maths.c
     src/robotics.c
     src/utils.c

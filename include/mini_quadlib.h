@@ -22,7 +22,7 @@ extern "C" {
  * @file mini_quadlib.h
  * @brief Mini-QuadLib - Simple quadrotor control library
  * @author Chengyu Yang
- * @version 0.1.1
+ * @version 0.1.2
  * @date 2026
  * 
  * This library provides the geometric controller for quadrotor control,
@@ -33,7 +33,7 @@ extern "C" {
 // VERSION INFO
 // =============================================================================
 
-#define QUADLIB_VERSION_STRING "0.1.1"
+#define QUADLIB_VERSION_STRING "0.1.2"
 
 /*
 Return the version string of the mini-quadlib library as char* ended with '\0'.
@@ -151,6 +151,37 @@ typedef struct {
 } state_t;
 
 /*
+State variables for L1 adaptive controller (previous & current).
+Use "ub + uad" for final augmented control.
+{
+vector3f_t vel;
+vector3f_t omega;
+vector3f_t vel_hat;
+vector3f_t omega_hat;
+vector3f_t sigma_f_hat;
+vector3f_t sigma_M_hat;
+quaternion4f_t quat;
+control_4f_t ub;
+control_4f_t uad;
+control_4f_t lpf1;
+control_4f_t lpf2;
+}
+*/
+typedef struct {
+    vector3f_t vel;             // velocity
+    vector3f_t omega;           // angular velocity
+    vector3f_t vel_hat;         // estimated velocity for adaptive control
+    vector3f_t omega_hat;       // estimated angular velocity for adaptive control
+    vector3f_t sigma_f_hat;     // estimated force disturbance for adaptive control (unmatched: fx, fy; matched: fz)
+    vector3f_t sigma_M_hat;     // estimated moment disturbance for adaptive control (matched: Mx, My, Mz)
+    quaternion4f_t quat;        // attitude quaternion (w, x, y, z)
+    control_4f_t ub;            // baseline control (thrust and moments), can be computed from geometric control or other control methods
+    control_4f_t uad;           // adaptive control (thrust and moments), computed from the estimated disturbances and adaptive laws
+    control_4f_t lpf1;          // low-pass filter 1
+    control_4f_t lpf2;          // low-pass filter 2
+} l1_state_t;
+
+/*
 Desired setpoint from planner:
 {
 vector3f_t pos
@@ -180,15 +211,23 @@ Controller parameters for geometric controller:
 vector3f_t k_p
 vector3f_t k_v
 vector3f_t k_R
-vector3f_t k_O
+vector3f_t k_W
 }
 */
 typedef struct {
     vector3f_t k_p;             // Position gains, x y z
     vector3f_t k_v;             // Velocity gains, x y z
     vector3f_t k_R;             // Attitude gains, x y z
-    vector3f_t k_O;             // Angular velocity gains, x y z
+    vector3f_t k_W;             // Angular velocity gains, x y z
 } geometric_params_t;
+
+typedef struct {
+    float As_v;
+    float As_W;
+    float lpf1_cutoffreq_f;
+    float lpf1_cutoffreq_M;
+    float lpf2_cutoffreq_M;
+} l1_params_t;
 
 /*
 Parameters for quadrotor in "X" configuration:
@@ -197,8 +236,8 @@ vector3f_t inertia
 float mass
 float xlen
 float ylen
-float k_thrust
-float k_drag
+float k_eta
+float k_m
 }
 NED frame: X points up, Y points right, Z points into the plane
        X
@@ -216,42 +255,77 @@ typedef struct {
     float mass;           // mass of the drone [kg]
     float xlen;           // distance between motors on x axis [m]
     float ylen;           // distance between motors on y axis [m]
-    float k_thrust;       // thrust coefficient [N/(rad/s)^2]
-    float k_drag;         // drag (torque) coefficient [Nm/(rad/s)^2]
+    float k_eta;          // thrust coefficient [N/(rad/s)^2]
+    float k_m;            // yaw moment coefficient [Nm/(rad/s)^2]
 } quadx_params_t;
 
 // =============================================================================
-// CORE CONTROLLER FUNCTIONS: GEOMETRIC CONTROLLER
+// CORE CONTROLLER FUNCTIONS: GEOMETRIC CONTROL
 // =============================================================================
 
 /**
- * @brief Geometric controller for quadrotor (NED), repquiring full parameter list
+ * @brief Geometric control for quadrotor (NED), requiring full parameter list
  * 
- * @param output_control_TM Pointer to store the output control (thrust and moments)
+ * @param output_control_fM Pointer to store the output control (thrust and moments)
  * @param current_state Pointer to the current state of the quadrotor
  * @param desired_state Pointer to the desired setpoint state
- * @param dt Time step since last control update [s]
- * @param ctrl_params Pointer to the geometric controller parameters 
+ * @param ctrl_params Pointer to the geometric control parameters 
  * @param quad_params Pointer to the quadrotor physical parameters
  * 
- * @return An enum type (quadlib_result_t) result of the controller computation, showing success or error code
+ * @return An enum type (quadlib_result_t) result of the control computation, showing success or error code
  * 
  * @note You can use macro QUADLIB_CHECK() to check the returned status.
  * 
  * @example
  * @code{.c}
- *     QUADLIB_CHECK(geometric_controller_TM_fullparam(&output_control_TM,
- *                                                     &current_state,
- *                                                     &desired_state,
- *                                                     dt,
- *                                                     &params));
+ *     QUADLIB_CHECK(geometric_control_fM_fullparam(&output_control_fM,
+ *                                                  &current_state,
+ *                                                  &desired_state,
+ *                                                  &ctrl_params,
+ *                                                  &quad_params));
  * @endcode
  */
-quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_TM,
-                                                    const state_t* current_state,
-                                                    const setpoint_t* desired_state,
-                                                    const geometric_params_t* ctrl_params,
-                                                    const quadx_params_t* quad_params);
+quadlib_result_t geometric_control_fM_fullparam(control_4f_t* output_control_fM,
+                                                const state_t* current_state,
+                                                const setpoint_t* desired_state,
+                                                const geometric_params_t* ctrl_params,
+                                                const quadx_params_t* quad_params);
+
+// =============================================================================
+// CORE CONTROLLER FUNCTIONS: L1 ADAPTIVE CONTROL
+// =============================================================================
+
+/**
+ * @brief L1 adaptive control for quadrotor (NED), requiring full parameter list and previous state for adaptation.
+ *        IMPORTANT: (1) Use the control "previous->ub + previous->uad" or "current->ub + previous->uad".
+ *                   (2) L1 states "previous" and "current" will be exactly the same after the function call.
+ * 
+ * @param previous Pointer to the previous state of the L1 adaptive controller (for storing past information for adaptation), will be updated by the function
+ * @param current Pointer to the current state of the L1 adaptive controller (for storing current information and output control)
+ * @param dt Time step for the control update
+ * @param l1_params Pointer to the L1 adaptive control parameters
+ * @param quad_params Pointer to the quadrotor physical parameters
+ * 
+ * @return An enum type (quadlib_result_t) result of the control computation, showing success or error code
+ * 
+ * @note You can use macro QUADLIB_CHECK() to check the returned status.
+ *       SPECIAL: (1) This function requires the "previous" state to be maintained across calls to enable the adaptive control.
+ *                (2) L1 states "previous" and "current" will be exactly the same after the function call.
+ * 
+ * @example
+ * @code{.c}
+ *     QUADLIB_CHECK(l1_adaptive_control_fullparam(&previous,
+ *                                                 &current,
+ *                                                 dt,
+ *                                                 &l1_params,
+ *                                                 &quad_params));
+ * @endcode
+ */
+quadlib_result_t l1_adaptive_control_fullparam(l1_state_t* previous,
+                                               l1_state_t* current,
+                                               const float dt,
+                                               const l1_params_t* l1_params,
+                                               const quadx_params_t* quad_params);
 
 // =============================================================================
 // UTILITY FUNCTIONS: ROBOTICS TOOLS

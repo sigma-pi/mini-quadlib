@@ -1,7 +1,7 @@
 #include "../include/mini_quadlib.h"
 
 // =============================================================================
-// CORE CONTROLLER FUNCTIONS: GEOMETRIC CONTROLLER
+// CORE CONTROLLER FUNCTIONS: GEOMETRIC CONTROL
 // =============================================================================
 
 static matrix3f_t unit_vec(vector3f_t q, vector3f_t q_dot, vector3f_t q_ddot)
@@ -11,25 +11,25 @@ static matrix3f_t unit_vec(vector3f_t q, vector3f_t q_dot, vector3f_t q_ddot)
     float qdot_qdot = q_dot.x * q_dot.x + q_dot.y * q_dot.y + q_dot.z * q_dot.z;
     float q_qddot = q.x * q_ddot.x + q.y * q_ddot.y + q.z * q_ddot.z;
 
-    vector3f_t u = {
+    vector3f_t u = (vector3f_t){
         q.x / q_norm,
         q.y / q_norm,
         q.z / q_norm
     };
 
-    vector3f_t u_dot = {
+    vector3f_t u_dot = (vector3f_t){
         q_dot.x / q_norm - q.x * q_qdot / powf(q_norm, 3),
         q_dot.y / q_norm - q.y * q_qdot / powf(q_norm, 3),
         q_dot.z / q_norm - q.z * q_qdot / powf(q_norm, 3)
     };
 
-    vector3f_t u_ddot = {
+    vector3f_t u_ddot = (vector3f_t){
         q_ddot.x / q_norm - q_dot.x / powf(q_norm, 3) * 2.0f * q_qdot - q.x / powf(q_norm, 3) * (qdot_qdot + q_qddot) + q.x * 3.0f / powf(q_norm, 5) * powf(q_qdot, 2),
         q_ddot.y / q_norm - q_dot.y / powf(q_norm, 3) * 2.0f * q_qdot - q.y / powf(q_norm, 3) * (qdot_qdot + q_qddot) + q.y * 3.0f / powf(q_norm, 5) * powf(q_qdot, 2),
         q_ddot.z / q_norm - q_dot.z / powf(q_norm, 3) * 2.0f * q_qdot - q.z / powf(q_norm, 3) * (qdot_qdot + q_qddot) + q.z * 3.0f / powf(q_norm, 5) * powf(q_qdot, 2)
     };
 
-    matrix3f_t result = {
+    matrix3f_t result = (matrix3f_t){
         .colx = u,
         .coly = u_dot,
         .colz = u_ddot
@@ -38,11 +38,11 @@ static matrix3f_t unit_vec(vector3f_t q, vector3f_t q_dot, vector3f_t q_ddot)
     return result;
 }
 
-quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_TM,
-                                                    const state_t* current_state,
-                                                    const setpoint_t* desired_state,
-                                                    const geometric_params_t* ctrl_params,
-                                                    const quadx_params_t* quad_params)
+quadlib_result_t geometric_control_fM_fullparam(control_4f_t* output_control_fM,
+                                                const state_t* current_state,
+                                                const setpoint_t* desired_state,
+                                                const geometric_params_t* ctrl_params,
+                                                const quadx_params_t* quad_params)
 {
     matrix3f_t mat1_temp;
     matrix3f_t mat2_temp;
@@ -76,22 +76,30 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(vector3_dot(&target_thrust, &target_force, &R.colz));
     target_thrust = -target_thrust;
 
-    vector3f_t z_axis_desired = {-target_force.x,
-                                 -target_force.y,
-                                 -target_force.z};
+    vector3f_t z_axis_desired = (vector3f_t){
+        -target_force.x,
+        -target_force.y,
+        -target_force.z
+    };
     QUADLIB_CHECK(vector3_normalize(&z_axis_desired, &z_axis_desired));
 
-    vector3f_t x_c_des = {cosf(desired_state->yaw),
-                          sinf(desired_state->yaw),
-                          0.0f};
-    vector3f_t x_c_des_dot = {-sinf(desired_state->yaw) * desired_state->yaw_dot,
-                              cosf(desired_state->yaw) * desired_state->yaw_dot,
-                              0.0f};
-    vector3f_t x_c_des_ddot = {-cosf(desired_state->yaw) * desired_state->yaw_dot * desired_state->yaw_dot
-                               -sinf(desired_state->yaw) * desired_state->yaw_ddot,
-                               -sinf(desired_state->yaw) * desired_state->yaw_dot * desired_state->yaw_dot
-                               +cosf(desired_state->yaw) * desired_state->yaw_ddot,
-                               0.0f};
+    vector3f_t x_c_des = (vector3f_t){
+        cosf(desired_state->yaw),
+        sinf(desired_state->yaw),
+        0.0f
+    };
+    vector3f_t x_c_des_dot = (vector3f_t){
+        -sinf(desired_state->yaw) * desired_state->yaw_dot,
+        cosf(desired_state->yaw) * desired_state->yaw_dot,
+        0.0f
+    };
+    vector3f_t x_c_des_ddot = (vector3f_t){
+        -cosf(desired_state->yaw) * desired_state->yaw_dot * desired_state->yaw_dot
+        -sinf(desired_state->yaw) * desired_state->yaw_ddot,
+        -sinf(desired_state->yaw) * desired_state->yaw_dot * desired_state->yaw_dot
+        +cosf(desired_state->yaw) * desired_state->yaw_ddot,
+        0.0f
+    };
     
     vector3f_t y_axis_desired;
     QUADLIB_CHECK(vector3_cross(&y_axis_desired, &z_axis_desired, &x_c_des));
@@ -101,7 +109,7 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(vector3_cross(&x_axis_desired, &y_axis_desired, &z_axis_desired));
     QUADLIB_CHECK(vector3_normalize(&x_axis_desired, &x_axis_desired));
 
-    matrix3f_t Rdes = {
+    matrix3f_t Rdes = (matrix3f_t){
         .colx = x_axis_desired,
         .coly = y_axis_desired,
         .colz = z_axis_desired
@@ -116,7 +124,7 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(matrix3_dot(&Rdes_T_R, &Rdes_T, &R));
     QUADLIB_CHECK(matrix3_dot(&R_T_Rdes, &R_T, &Rdes));
     QUADLIB_CHECK(matrix3_sub(&mat1_temp, &Rdes_T_R, &R_T_Rdes));
-    matrix3f_t eRM = {
+    matrix3f_t eRM = (matrix3f_t){
         .colx = {0.5f * mat1_temp.colx.x, 0.5f * mat1_temp.colx.y, 0.5f * mat1_temp.colx.z},
         .coly = {0.5f * mat1_temp.coly.x, 0.5f * mat1_temp.coly.y, 0.5f * mat1_temp.coly.z},
         .colz = {0.5f * mat1_temp.colz.x, 0.5f * mat1_temp.colz.y, 0.5f * mat1_temp.colz.z}
@@ -124,13 +132,13 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     vector3f_t eR;
     QUADLIB_CHECK(matrix3_vee(&eR, &eRM));
 
-    vector3f_t a_error = {
+    vector3f_t a_error = (vector3f_t){
         -R.colz.x * target_thrust / quad_params->mass - desired_state->acc.x,
         -R.colz.y * target_thrust / quad_params->mass - desired_state->acc.y,
         -R.colz.z * target_thrust / quad_params->mass - desired_state->acc.z + QUADLIB_GRAVITY
     };
     
-    vector3f_t target_force_dot = {
+    vector3f_t target_force_dot = (vector3f_t){
         -ctrl_params->k_p.x * v_error.x - ctrl_params->k_v.x * a_error.x + quad_params->mass * desired_state->jerk.x,
         -ctrl_params->k_p.y * v_error.y - ctrl_params->k_v.y * a_error.y + quad_params->mass * desired_state->jerk.y,
         -ctrl_params->k_p.z * v_error.z - ctrl_params->k_v.z * a_error.z + quad_params->mass * desired_state->jerk.z
@@ -145,13 +153,13 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(vector3_dot(&scal2_temp, &target_force, &b3_dot));
     float target_thrust_dot = -scal1_temp - scal2_temp;
 
-    vector3f_t j_error = {
+    vector3f_t j_error = (vector3f_t){
         -R.colz.x * target_thrust_dot / quad_params->mass - b3_dot.x * target_thrust / quad_params->mass - desired_state->jerk.x,
         -R.colz.y * target_thrust_dot / quad_params->mass - b3_dot.y * target_thrust / quad_params->mass - desired_state->jerk.y,
         -R.colz.z * target_thrust_dot / quad_params->mass - b3_dot.z * target_thrust / quad_params->mass - desired_state->jerk.z
     };
 
-    vector3f_t target_force_ddot = {
+    vector3f_t target_force_ddot = (vector3f_t){
         -ctrl_params->k_p.x * a_error.x - ctrl_params->k_v.x * j_error.x + quad_params->mass * desired_state->snap.x,
         -ctrl_params->k_p.y * a_error.y - ctrl_params->k_v.y * j_error.y + quad_params->mass * desired_state->snap.y,
         -ctrl_params->k_p.z * a_error.z - ctrl_params->k_v.z * j_error.z + quad_params->mass * desired_state->snap.z
@@ -165,14 +173,14 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     vector3f_t b3c_ddot = b3cCollection.colz;
 
     QUADLIB_CHECK(vector3_cross(&vec1_temp, &x_c_des, &b3c));
-    vector3f_t A2 = {
+    vector3f_t A2 = (vector3f_t){
         -vec1_temp.x,
         -vec1_temp.y,
         -vec1_temp.z
     };
     QUADLIB_CHECK(vector3_cross(&vec1_temp, &x_c_des_dot, &b3c));
     QUADLIB_CHECK(vector3_cross(&vec2_temp, &x_c_des, &b3c_dot));
-    vector3f_t A2_dot = {
+    vector3f_t A2_dot = (vector3f_t){
         -(vec1_temp.x + vec2_temp.x),
         -(vec1_temp.y + vec2_temp.y),
         -(vec1_temp.z + vec2_temp.z)
@@ -180,7 +188,7 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(vector3_cross(&vec1_temp, &x_c_des_ddot, &b3c));
     QUADLIB_CHECK(vector3_cross(&vec2_temp, &x_c_des_dot, &b3c_dot));
     QUADLIB_CHECK(vector3_cross(&vec3_temp, &x_c_des, &b3c_ddot));
-    vector3f_t A2_ddot = {
+    vector3f_t A2_ddot = (vector3f_t){
         -(vec1_temp.x + 2.0f * vec2_temp.x + vec3_temp.x),
         -(vec1_temp.y + 2.0f * vec2_temp.y + vec3_temp.y),
         -(vec1_temp.z + 2.0f * vec2_temp.z + vec3_temp.z)
@@ -193,7 +201,7 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
 
     QUADLIB_CHECK(vector3_cross(&vec1_temp, &b2c_dot, &b3c));
     QUADLIB_CHECK(vector3_cross(&vec2_temp, &b2c, &b3c_dot));
-    vector3f_t b1c_dot = {
+    vector3f_t b1c_dot = (vector3f_t){
         vec1_temp.x + vec2_temp.x,
         vec1_temp.y + vec2_temp.y,
         vec1_temp.z + vec2_temp.z
@@ -202,18 +210,18 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     QUADLIB_CHECK(vector3_cross(&vec1_temp, &b2c_ddot, &b3c));
     QUADLIB_CHECK(vector3_cross(&vec2_temp, &b2c_dot, &b3c_dot));
     QUADLIB_CHECK(vector3_cross(&vec3_temp, &b2c, &b3c_ddot));
-    vector3f_t b1c_ddot = {
+    vector3f_t b1c_ddot = (vector3f_t){
         vec1_temp.x + 2.0f * vec2_temp.x + vec3_temp.x,
         vec1_temp.y + 2.0f * vec2_temp.y + vec3_temp.y,
         vec1_temp.z + 2.0f * vec2_temp.z + vec3_temp.z
     };
 
-    matrix3f_t Rd_dot = {
+    matrix3f_t Rd_dot = (matrix3f_t){
         .colx = b1c_dot,
         .coly = b2c_dot,
         .colz = b3c_dot
     };
-    matrix3f_t Rd_ddot = {
+    matrix3f_t Rd_ddot = (matrix3f_t){
         .colx = b1c_ddot,
         .coly = b2c_ddot,
         .colz = b3c_ddot
@@ -230,16 +238,16 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
 
     QUADLIB_CHECK(matrix3_dot(&mat1_temp, &R_T, &Rdes));
     QUADLIB_CHECK(matrix3_dotv(&vec1_temp, &mat1_temp, &omegad));
-    vector3f_t ew = {
+    vector3f_t ew = (vector3f_t){
         current_state->omega.x - vec1_temp.x,
         current_state->omega.y - vec1_temp.y,
         current_state->omega.z - vec1_temp.z
     };
 
-    vector3f_t M = {
-        -ctrl_params->k_R.x * eR.x - ctrl_params->k_O.x * ew.x,
-        -ctrl_params->k_R.y * eR.y - ctrl_params->k_O.y * ew.y,
-        -ctrl_params->k_R.z * eR.z - ctrl_params->k_O.z * ew.z
+    vector3f_t M = (vector3f_t){
+        -ctrl_params->k_R.x * eR.x - ctrl_params->k_W.x * ew.x,
+        -ctrl_params->k_R.y * eR.y - ctrl_params->k_W.y * ew.y,
+        -ctrl_params->k_R.z * eR.z - ctrl_params->k_W.z * ew.z
     };
     // M = M - J * (hatOperator(Omega) * R.transposed() * Rdes * Omegad - R.transposed() * Rdes * Omegad_dot);
     QUADLIB_CHECK(matrix3_dotv(&vec2_temp, &mat1_temp, &omegad_dot));
@@ -262,10 +270,10 @@ quadlib_result_t geometric_controller_TM_fullparam(control_4f_t* output_control_
     M.z = M.z + vec2_temp.z;
 
     // Thrust and Moment output
-    output_control_TM->u1 = target_thrust;
-    output_control_TM->u2 = M.x;
-    output_control_TM->u3 = M.y;
-    output_control_TM->u4 = M.z;
+    output_control_fM->u1 = target_thrust;
+    output_control_fM->u2 = M.x;
+    output_control_fM->u3 = M.y;
+    output_control_fM->u4 = M.z;
 
     return QUADLIB_SUCCESS;
 }
