@@ -405,6 +405,76 @@ class QuadrotorState:
         state.omega = _numpy_to_vector3f(self.angular_velocity)
         return state
 
+class L1AdaptiveState:
+    """
+    State variables for L1 adaptive controller
+    Maintains internal state across control iterations for adaptation
+    
+    Use "baseline_control + adaptive_control" for final augmented control output
+    """
+    
+    def __init__(self):
+        """Initialize L1 adaptive state with zeros"""
+        self.velocity = np.zeros(3, dtype=np.float32)
+        self.angular_velocity = np.zeros(3, dtype=np.float32)
+        self.velocity_estimate = np.zeros(3, dtype=np.float32)
+        self.angular_velocity_estimate = np.zeros(3, dtype=np.float32)
+        self.force_disturbance_estimate = np.zeros(3, dtype=np.float32)
+        self.moment_disturbance_estimate = np.zeros(3, dtype=np.float32)
+        self.attitude = Quaternion.identity()
+        self.baseline_control = np.zeros(4, dtype=np.float32)
+        self.adaptive_control = np.zeros(4, dtype=np.float32)
+        self._lpf1 = np.zeros(4, dtype=np.float32)
+        self._lpf2 = np.zeros(4, dtype=np.float32)
+    
+    def _to_c_struct(self) -> _l1_state_t:
+        """Convert to internal C structure"""
+        state = _l1_state_t()
+        state.vel = _numpy_to_vector3f(self.velocity)
+        state.omega = _numpy_to_vector3f(self.angular_velocity)
+        state.vel_hat = _numpy_to_vector3f(self.velocity_estimate)
+        state.omega_hat = _numpy_to_vector3f(self.angular_velocity_estimate)
+        state.sigma_f_hat = _numpy_to_vector3f(self.force_disturbance_estimate)
+        state.sigma_M_hat = _numpy_to_vector3f(self.moment_disturbance_estimate)
+        state.quat = self.attitude._to_c_struct()
+        state.ub = _numpy_to_control4f(self.baseline_control)
+        state.uad = _numpy_to_control4f(self.adaptive_control)
+        state.lpf1 = _numpy_to_control4f(self._lpf1)
+        state.lpf2 = _numpy_to_control4f(self._lpf2)
+        return state
+    
+    def _from_c_struct(self, c_state: _l1_state_t):
+        """Update from internal C structure"""
+        self.velocity = _vector3f_to_numpy(c_state.vel)
+        self.angular_velocity = _vector3f_to_numpy(c_state.omega)
+        self.velocity_estimate = _vector3f_to_numpy(c_state.vel_hat)
+        self.angular_velocity_estimate = _vector3f_to_numpy(c_state.omega_hat)
+        self.force_disturbance_estimate = _vector3f_to_numpy(c_state.sigma_f_hat)
+        self.moment_disturbance_estimate = _vector3f_to_numpy(c_state.sigma_M_hat)
+        self.attitude = Quaternion._from_c_struct(c_state.quat)
+        self.baseline_control = _control4f_to_numpy(c_state.ub)
+        self.adaptive_control = _control4f_to_numpy(c_state.uad)
+        self._lpf1 = _control4f_to_numpy(c_state.lpf1)
+        self._lpf2 = _control4f_to_numpy(c_state.lpf2)
+    
+    def get_total_control(self) -> np.ndarray:
+        """Get total control output (baseline + adaptive)"""
+        return self.baseline_control + self.adaptive_control
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for inspection/logging"""
+        return {
+            'velocity': self.velocity.tolist(),
+            'angular_velocity': self.angular_velocity.tolist(),
+            'velocity_estimate': self.velocity_estimate.tolist(),
+            'angular_velocity_estimate': self.angular_velocity_estimate.tolist(),
+            'force_disturbance_estimate': self.force_disturbance_estimate.tolist(),
+            'moment_disturbance_estimate': self.moment_disturbance_estimate.tolist(),
+            'attitude': self.attitude.to_dict(),
+            'baseline_control': self.baseline_control.tolist(),
+            'adaptive_control': self.adaptive_control.tolist(),
+        }
+
 class QuadrotorSetpoint:
     """
     Desired setpoint for quadrotor including position, velocity, acceleration, jerk, snap, and yaw
@@ -460,34 +530,42 @@ def geometric_control(current_state: QuadrotorState,
                       velocity_gains: np.ndarray, 
                       attitude_gains: np.ndarray,
                       angular_velocity_gains: np.ndarray,
-                      quadrotor_mass: float,
-                      quadrotor_inertia: np.ndarray,
-                      arm_length_x: float,
-                      arm_length_y: float,
-                      thrust_coefficient: float,
-                      moment_coefficient: float) -> np.ndarray:
+                      mass: float,
+                      inertia: np.ndarray) -> np.ndarray:
     """
-    Geometric control for quadrotor
+    Geometric control for quadrotor (NED frame)
+    
+    Args:
+        current_state: Current quadrotor state (position, velocity, attitude, angular velocity)
+        desired_setpoint: Desired setpoint (position, velocity, acceleration, jerk, snap, yaw)
+        position_gains: Position control gains [kp_x, kp_y, kp_z]
+        velocity_gains: Velocity control gains [kv_x, kv_y, kv_z]
+        attitude_gains: Attitude control gains [kR_x, kR_y, kR_z]
+        angular_velocity_gains: Angular velocity control gains [kW_x, kW_y, kW_z]
+        mass: Quadrotor mass [kg]
+        inertia: Quadrotor inertia [Ixx, Iyy, Izz] [kg*m^2]
     
     Returns:
         Control output as numpy array [thrust, moment_x, moment_y, moment_z]
     """
-    # Create parameter structures
+    # Create controller parameter structure
     ctrl_params = _geometric_params_t()
     ctrl_params.k_p = _numpy_to_vector3f(position_gains)
     ctrl_params.k_v = _numpy_to_vector3f(velocity_gains)
     ctrl_params.k_R = _numpy_to_vector3f(attitude_gains)
     ctrl_params.k_W = _numpy_to_vector3f(angular_velocity_gains)
     
+    # Create quadrotor parameter structure (only mass and inertia are used)
     quad_params = _quadx_params_t()
-    quad_params.mass = float(quadrotor_mass)
-    quad_params.inertia = _numpy_to_vector3f(quadrotor_inertia)
-    quad_params.xlen = float(arm_length_x)
-    quad_params.ylen = float(arm_length_y)
-    quad_params.k_eta = float(thrust_coefficient)
-    quad_params.k_m = float(moment_coefficient)
+    quad_params.mass = float(mass)
+    quad_params.inertia = _numpy_to_vector3f(inertia)
+    # Set unused members to default values
+    quad_params.xlen = 0.0
+    quad_params.ylen = 0.0
+    quad_params.k_eta = 0.0
+    quad_params.k_m = 0.0
     
-    # Convert states
+    # Convert states to C structures
     c_current_state = current_state._to_c_struct()
     c_desired_setpoint = desired_setpoint._to_c_struct()
     
@@ -501,6 +579,99 @@ def geometric_control(current_state: QuadrotorState,
                     ctypes.byref(quad_params))
     
     return _control4f_to_numpy(output_control)
+
+def l1_adaptive_control(previous_state: L1AdaptiveState,
+                        current_velocity: np.ndarray,
+                        current_angular_velocity: np.ndarray,
+                        current_attitude: Quaternion,
+                        baseline_control: np.ndarray,
+                        dt: float,
+                        As_v: float,
+                        As_W: float,
+                        lpf1_cutoff_freq_force: float,
+                        lpf1_cutoff_freq_moment: float,
+                        lpf2_cutoff_freq_moment: float,
+                        mass: float,
+                        inertia: np.ndarray) -> L1AdaptiveState:
+    """
+    L1 adaptive control for quadrotor (NED frame)
+    
+    IMPORTANT: 
+    - Take the returned L1AdaptiveState ("output_state") and pass it as "previous_state" 
+        in the next iteration to maintain adaptation history
+    - Use "output_state.baseline_control + output_state.adaptive_control" 
+        or call output_state.get_total_control() for final augmented control
+    - Recommend using external enable flags to switch between baseline and adaptive control for safety during testing,
+        e.g., "final_control = baseline_control + adaptive_enable * adaptive_control"
+    
+    Args:
+        previous_state: Previous L1 adaptive state (maintains adaptation history)
+        current_velocity: Current velocity [vx, vy, vz] [m/s]
+        current_angular_velocity: Current angular velocity [wx, wy, wz] [rad/s]
+        current_attitude: Current attitude quaternion
+        baseline_control: Baseline control [thrust, Mx, My, Mz] (e.g., from geometric control)
+        dt: Time step [s]
+        As_v: Adaptation gain for velocity
+        As_W: Adaptation gain for angular velocity
+        lpf1_cutoff_freq_force: Low-pass filter 1 cutoff frequency for force [Hz]
+        lpf1_cutoff_freq_moment: Low-pass filter 1 cutoff frequency for moment [Hz]
+        lpf2_cutoff_freq_moment: Low-pass filter 2 cutoff frequency for moment [Hz]
+        mass: Quadrotor mass [kg]
+        inertia: Quadrotor inertia [Ixx, Iyy, Izz] [kg*m^2]
+    
+    Returns:
+        Updated L1AdaptiveState ("output_state") with computed adaptive control
+    """
+    # Create L1 parameter structure
+    l1_params = _l1_params_t()
+    l1_params.As_v = float(As_v)
+    l1_params.As_W = float(As_W)
+    l1_params.lpf1_cutoffreq_f = float(lpf1_cutoff_freq_force)
+    l1_params.lpf1_cutoffreq_M = float(lpf1_cutoff_freq_moment)
+    l1_params.lpf2_cutoffreq_M = float(lpf2_cutoff_freq_moment)
+    
+    # Create quadrotor parameter structure (only mass and inertia are used)
+    quad_params = _quadx_params_t()
+    quad_params.mass = float(mass)
+    quad_params.inertia = _numpy_to_vector3f(inertia)
+    # Set unused members to default values
+    quad_params.xlen = 0.0
+    quad_params.ylen = 0.0
+    quad_params.k_eta = 0.0
+    quad_params.k_m = 0.0
+    
+    # Prepare previous state C structure
+    c_previous = previous_state._to_c_struct()
+    
+    # Prepare current state C structure
+    c_current = _l1_state_t()
+    c_current.vel = _numpy_to_vector3f(current_velocity)
+    c_current.omega = _numpy_to_vector3f(current_angular_velocity)
+    c_current.quat = current_attitude._to_c_struct()
+    c_current.ub = _numpy_to_control4f(baseline_control)
+    # Copy estimates from previous state as initial values
+    c_current.vel_hat = c_previous.vel_hat
+    c_current.omega_hat = c_previous.omega_hat
+    c_current.sigma_f_hat = c_previous.sigma_f_hat
+    c_current.sigma_M_hat = c_previous.sigma_M_hat
+    c_current.uad = c_previous.uad
+    c_current.lpf1 = c_previous.lpf1
+    c_current.lpf2 = c_previous.lpf2
+    
+    # Call C function
+    _call_c_function('l1_adaptive_control_fullparam',
+                    ctypes.byref(c_previous),
+                    ctypes.byref(c_current),
+                    ctypes.c_float(dt),
+                    ctypes.byref(l1_params),
+                    ctypes.byref(quad_params))
+    
+    # Create output state from C result
+    # Note: After the C function call, previous and current are the same
+    output_state = L1AdaptiveState()
+    output_state._from_c_struct(c_current)
+    
+    return output_state
 
 # =============================================================================
 # ROBOTICS UTILITY FUNCTIONS
@@ -606,10 +777,10 @@ __all__ = [
     'get_version',
     
     # Special classes
-    'Quaternion', 'RotationMatrix', 'QuadrotorState', 'QuadrotorSetpoint',
+    'Quaternion', 'RotationMatrix', 'QuadrotorState', 'L1AdaptiveState', 'QuadrotorSetpoint',
     
     # Core controllers
-    'geometric_control',
+    'geometric_control', 'l1_adaptive_control',
     
     # Robotics utilities
     'transform_world_to_body', 'transform_body_to_world', 'coordinate_transform',
