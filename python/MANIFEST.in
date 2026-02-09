@@ -1,0 +1,6 @@
+include ../README.md
+include ../LICENSE
+include ../include/*.h
+include ../build/libmini_quadlib.a
+recursive-include mini_quadlib *.py
+recursive-include mini_quadlib *.typed

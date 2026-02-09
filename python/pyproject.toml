@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-quadlib"
+version = "0.1.2"
+description = "Python bindings for mini-quadlib: A C library for quadrotor control (Linux)"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+authors = [
+  {name = "Chengyu Yang", email = "chengyuy520@gmail.com"},
+]
+keywords = ["robotics", "quadrotor", "control", "aerospace"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "numpy>=1.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6.0",
+  "pytest-cov",
+  "black",
+  "flake8",
+]
+
+[project.urls]
+Homepage = "https://github.com/sigma-pi/mini-quadlib"
+Repository = "https://github.com/sigma-pi/mini-quadlib"
+Issues = "https://github.com/sigma-pi/mini-quadlib/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mini_quadlib*"]
+
+[tool.setuptools.package-data]
+mini_quadlib = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ['py37']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
