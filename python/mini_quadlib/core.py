@@ -169,7 +169,7 @@ def _setup_c_functions():
     
     try_setup('l1_adaptive_control_fullparam', [
         ctypes.POINTER(_l1_state_t), ctypes.POINTER(_l1_state_t), ctypes.c_float,
-        ctypes.POINTER(_l1_params_t), ctypes.POINTER(_quadx_params_t)
+        ctypes.c_float, ctypes.POINTER(_l1_params_t), ctypes.POINTER(_quadx_params_t)
     ], ctypes.c_int)
     
     # Robotics tools
@@ -586,13 +586,14 @@ def l1_adaptive_control(previous_state: L1AdaptiveState,
                         current_attitude: Quaternion,
                         baseline_control: np.ndarray,
                         dt: float,
-                        As_v: float,
-                        As_W: float,
-                        lpf1_cutoff_freq_force: float,
-                        lpf1_cutoff_freq_moment: float,
-                        lpf2_cutoff_freq_moment: float,
-                        mass: float,
-                        inertia: np.ndarray) -> L1AdaptiveState:
+                        vtilde_xy_scale: float = 1.0,
+                        As_v: float = -5.0,
+                        As_W: float = -10.0,
+                        lpf1_cutoff_freq_force: float = 10.0,
+                        lpf1_cutoff_freq_moment: float = 10.0,
+                        lpf2_cutoff_freq_moment: float = 2.0,
+                        mass: float = 0.62,
+                        inertia: np.ndarray = None) -> L1AdaptiveState:
     """
     L1 adaptive control for quadrotor (NED frame)
     
@@ -611,6 +612,8 @@ def l1_adaptive_control(previous_state: L1AdaptiveState,
         current_attitude: Current attitude quaternion
         baseline_control: Baseline control [thrust, Mx, My, Mz] (e.g., from geometric control)
         dt: Time step [s]
+        vtilde_xy_scale: Scaling factor for adaptive velocity estimation error in XY plane (default 1.0).
+            Decrease when body z axis is too tilted. Setting to 0.0 can improve stability.
         As_v: Adaptation gain for velocity
         As_W: Adaptation gain for angular velocity
         lpf1_cutoff_freq_force: Low-pass filter 1 cutoff frequency for force [Hz]
@@ -663,6 +666,7 @@ def l1_adaptive_control(previous_state: L1AdaptiveState,
                     ctypes.byref(c_previous),
                     ctypes.byref(c_current),
                     ctypes.c_float(dt),
+                    ctypes.c_float(vtilde_xy_scale),
                     ctypes.byref(l1_params),
                     ctypes.byref(quad_params))
     

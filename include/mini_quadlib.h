@@ -309,10 +309,13 @@ quadlib_result_t geometric_control_fM_fullparam(control_4f_t* output_control_fM,
  * @brief L1 adaptive control for quadrotor (NED), requiring full parameter list and previous state for adaptation.
  *        IMPORTANT: (1) Use the control "previous->ub + previous->uad" or "current->ub + previous->uad".
  *                   (2) L1 states "previous" and "current" will be exactly the same after the function call.
+ *                   (3) When you are not using the adaptive control, set "uad" to zero before passing it to the next run, so that L1 adaptive control doesn't regard it as disturbance.
+ *                   (4) Set "vtilde_xy_scale = 1.0" by default, but decrease it when body z axis is too tilted. Setting "vtilde_xy_scale = 0.0" can probably improve stability.
  * 
  * @param previous Pointer to the previous state of the L1 adaptive controller (for storing past information for adaptation), will be updated by the function
  * @param current Pointer to the current state of the L1 adaptive controller (for storing current information and output control)
  * @param dt Time step for the control update
+ * @param vtilde_xy_scale Scaling factor for the adaptive velocity estimation error in the XY plane, as the less accurate velocity estimation in the horizontal plane may affect the stability of the adaptive control.
  * @param l1_params Pointer to the L1 adaptive control parameters
  * @param quad_params Pointer to the quadrotor physical parameters
  * 
@@ -327,6 +330,7 @@ quadlib_result_t geometric_control_fM_fullparam(control_4f_t* output_control_fM,
  *     QUADLIB_CHECK(l1_adaptive_control_fullparam(&previous,
  *                                                 &current,
  *                                                 dt,
+ *                                                 vtilde_xy_scale,
  *                                                 &l1_params,
  *                                                 &quad_params));
  * @endcode
@@ -334,6 +338,7 @@ quadlib_result_t geometric_control_fM_fullparam(control_4f_t* output_control_fM,
 quadlib_result_t l1_adaptive_control_fullparam(l1_state_t* previous,
                                                l1_state_t* current,
                                                const float dt,
+                                               const float vtilde_xy_scale,
                                                const l1_params_t* l1_params,
                                                const quadx_params_t* quad_params);
 

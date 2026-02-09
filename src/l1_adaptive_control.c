@@ -7,6 +7,7 @@
 quadlib_result_t l1_adaptive_control_fullparam(l1_state_t* previous,
                                                l1_state_t* current,
                                                const float dt,
+                                               const float vtilde_xy_scale,
                                                const l1_params_t* l1_params,
                                                const quadx_params_t* quad_params)
 {
@@ -83,8 +84,8 @@ quadlib_result_t l1_adaptive_control_fullparam(l1_state_t* previous,
     previous->omega_hat = current->omega_hat;  // update
 
     vector3f_t vpred_error = (vector3f_t){
-        current->vel_hat.x - current->vel.x,
-        current->vel_hat.y - current->vel.y,
+        (current->vel_hat.x - current->vel.x) * vtilde_xy_scale,
+        (current->vel_hat.y - current->vel.y) * vtilde_xy_scale,
         current->vel_hat.z - current->vel.z
     };
     vector3f_t Wpred_error = (vector3f_t){
