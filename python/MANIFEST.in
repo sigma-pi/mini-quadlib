@@ -1,6 +1,11 @@
+# Include documentation and license
 include ../README.md
 include ../LICENSE
-include ../include/*.h
-include ../build/libmini_quadlib.a
-recursive-include mini_quadlib *.py
-recursive-include mini_quadlib *.typed
+
+# Include shared library
+include mini_quadlib/*.so
+include mini_quadlib/libmini_quadlib.so
+recursive-include mini_quadlib *.so
+
+# Include type hints marker
+include mini_quadlib/py.typed
