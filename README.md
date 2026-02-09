@@ -59,9 +59,22 @@ This produces:
 #### Build Shared Library (for Python bindings)
 
 ```bash
-mkdir build && cd build
+# Create a virtual environment before building
+conda create --name mini_quadlib
+conda activate mini_quadlib
+
+# Build
+cd /path/to/mini-quadlib
+mkdir -p build && cd build
 cmake .. -DBUILD_PYTHON=ON
 make -j$(nproc)
+
+# Copy .so to package directory
+cp libmini_quadlib.so ../python/mini_quadlib/
+
+# Install
+cd ../python
+pip install -e .
 ```
 
 This produces:
