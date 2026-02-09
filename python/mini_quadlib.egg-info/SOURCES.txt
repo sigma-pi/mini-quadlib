@@ -5,6 +5,7 @@ pyproject.toml
 setup.py
 ../LICENSE
 ../README.md
+../build/libmini_quadlib.a
 ../include/mini_quadlib.h
 mini_quadlib/__init__.py
 mini_quadlib/core.py
