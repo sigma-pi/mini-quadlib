@@ -1,0 +1,75 @@
+name: Build and Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger for testing
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+          python -m pip install --upgrade pip build
+
+      - name: Build C library
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DBUILD_PYTHON=ON
+          make -j$(nproc)
+          ls -la libmini_quadlib.so
+
+      - name: Copy .so to package
+        run: |
+          cp build/libmini_quadlib.so python/mini_quadlib/
+          ls -la python/mini_quadlib/
+
+      - name: Build wheel
+        run: |
+          cd python
+          python -m build
+          # Verify .so is in wheel
+          unzip -l dist/*.whl | grep .so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: python/dist/
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release'
+    
+    permissions:
+      id-token: write  # Required for trusted publishing
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mini-quadlib
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
