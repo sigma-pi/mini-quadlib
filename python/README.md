@@ -1,17 +1,174 @@
-# Mini-QuadLib Python Bindings
+# Mini-QuadLib
 
-Pythonic interface to the mini-quadlib C library for quadrotor control.
+A lightweight C library for quadrotor control systems, with Python bindings.
 
-## Installation
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### From Source (Recommended)
+## Features
+
+- **Geometric Controller** - SE(3) geometric control for quadrotors
+- **L1 Adaptive Control** - Robust adaptive augmentation for disturbance rejection
+- **Robotics Utilities** - Coordinate transforms, frame conversions, rotation representations
+- **Lightweight** - Requires minimal dependencies
+- **Cross-platform** - C library works anywhere, Python bindings for Linux
+
+## Repository Structure
+
+```
+mini-quadlib/
+├── include/
+│   └── mini_quadlib.h      # Main C header (all API documentation here)
+├── src/
+│   └── *.c                 # C implementation
+├── python/
+│   └── mini_quadlib/       # Python package
+├── build/                  # Build output (generated)
+├── CMakeLists.txt
+└── README.md
+```
+
+---
+
+## C Library
+
+### Building (Linux)
+
+#### Prerequisites
+
+- CMake >= 3.8
+- GCC or Clang
+
+#### Build Static Library
 
 ```bash
-# Clone and build C library
+# Clone the repository
 git clone https://github.com/sigma-pi/mini-quadlib.git
 cd mini-quadlib
 
-# Build shared library
+# Create build directory
+mkdir build && cd build
+
+# Configure and build
+cmake ..
+make -j$(nproc)
+```
+
+This produces:
+- `build/libmini_quadlib.a` - Static library
+
+#### Build Shared Library (for Python bindings)
+
+```bash
+# Create a virtual environment before building
+conda create --name mini_quadlib
+conda activate mini_quadlib
+
+# Build
+cd /path/to/mini-quadlib
+mkdir -p build && cd build
+cmake .. -DBUILD_PYTHON=ON
+make -j$(nproc)
+
+# Copy .so to package directory
+cp libmini_quadlib.so ../python/mini_quadlib/
+
+# Install
+cd ../python
+pip install -e .
+```
+
+This produces:
+- `build/libmini_quadlib.so` - Shared library
+
+### Using the C Library
+
+#### Include in Your Project
+
+```c
+#include "mini_quadlib.h"
+
+int main() {
+  // Get library version
+  printf("mini-quadlib version: %s\n", quadlib_version());
+  
+  // Create state and setpoint
+  state_t current_state = {
+      .pos = {0.0f, 0.0f, 0.0f},
+      .vel = {0.0f, 0.0f, 0.0f},
+      .quat = {1.0f, 0.0f, 0.0f, 0.0f},  // w, x, y, z
+      .omega = {0.0f, 0.0f, 0.0f}
+  };
+  
+  setpoint_t desired = {
+      .pos = {1.0f, 0.0f, -1.0f},  // NED frame
+      .vel = {0.0f, 0.0f, 0.0f},
+      .acc = {0.0f, 0.0f, 0.0f},
+      .jerk = {0.0f, 0.0f, 0.0f},
+      .snap = {0.0f, 0.0f, 0.0f},
+      .yaw = 0.0f,
+      .yaw_dot = 0.0f,
+      .yaw_ddot = 0.0f
+  };
+  
+  // Controller parameters
+  geometric_params_t ctrl_params = {
+      .k_p = {1.0f, 1.0f, 2.0f},
+      .k_v = {0.5f, 0.5f, 1.0f},
+      .k_R = {1.0f, 1.0f, 1.0f},
+      .k_W = {0.1f, 0.1f, 0.1f}
+  };
+  
+  quadx_params_t quad_params = {
+      .mass = 1.0f,
+      .inertia = {0.01f, 0.01f, 0.02f}
+  };
+  
+  // Compute control
+  control_4f_t output;
+  quadlib_result_t result = geometric_control_fM_fullparam(
+      &output, &current_state, &desired, &ctrl_params, &quad_params
+  );
+  
+  if (result == QUADLIB_SUCCESS) {
+      printf("Thrust: %.2f, Moments: [%.2f, %.2f, %.2f]\n",
+             output.u1, output.u2, output.u3, output.u4);
+  }
+  
+  return 0;
+}
+```
+
+#### Compile Your Program
+
+```bash
+gcc -I/path/to/mini-quadlib/include \
+  -L/path/to/mini-quadlib/build \
+  your_program.c -lmini_quadlib -lm -o your_program
+```
+
+### C API Reference
+
+All C API documentation is in the header file:
+
+📖 **[include/mini_quadlib.h](include/mini_quadlib.h)**
+
+Key sections:
+- **Data Structures** - `vector3f_t`, `quaternion4f_t`, `state_t`, `setpoint_t`, etc.
+- **Geometric Control** - `geometric_control_fM_fullparam()`
+- **L1 Adaptive Control** - `l1_adaptive_control_fullparam()`
+- **Coordinate Transforms** - `enu_to_ned()`, `ned_to_enu()`, `coordinate_transform_omni()`
+- **Rotation Utilities** - Quaternion/Euler/RotationMatrix conversions
+
+---
+
+## Python Bindings
+
+### Quick Install (from source)
+
+```bash
+cd mini-quadlib
+
+# Build C library first
 mkdir build && cd build
 cmake .. -DBUILD_PYTHON=ON
 make -j$(nproc)
@@ -22,302 +179,38 @@ cd python
 pip install -e .
 ```
 
-### Verify Installation
-
-```python
-import mini_quadlib as mql
-print(mql.get_version())  # Should print "0.1.2"
-```
-
 ### Run Basic Tests
 ```bash
-python ./tests/test_python_api.py
+python ./python/tests/test_python_api.py
 ```
 
----
-
-## Quick Start
-
-### Basic Usage
+### Quick Test
 
 ```python
 import mini_quadlib as mql
 import numpy as np
 
-# Quaternion operations
-q1 = mql.Quaternion(0.707, 0.0, 0.0, 0.707)  # 90° rotation about z
-q2 = mql.Quaternion.identity()
+print(f"Version: {mql.get_version()}")
 
-q_normalized = q1.normalize()
-q_product = q1 * q2
-q_conj = q1.conjugate()
+# Create a quaternion
+q = mql.Quaternion(0.707, 0.0, 0.0, 0.707)
+print(f"Quaternion: {q}")
 
-print(f"Quaternion: {q1}")
-print(f"As array: {q1.to_array()}")
-print(f"As dict: {q1.to_dict()}")
-
-# Rotation matrix
-R = mql.RotationMatrix.identity()
-R_from_euler = mql.euler_to_rotation_matrix(np.array([0.1, 0.2, 0.3]))
-
-# Convert between representations
-q_from_R = mql.rotation_matrix_to_quaternion(R_from_euler)
-euler_back = mql.rotation_matrix_to_euler(R_from_euler)
-
-# Coordinate transforms
-ned_vec = np.array([1.0, 2.0, 3.0])
-enu_vec = mql.ned_to_enu(ned_vec)
-ned_back = mql.enu_to_ned(enu_vec)
-
-# Frame transforms
-body_vec = mql.transform_world_to_body(ned_vec, q1)
-world_vec = mql.transform_body_to_world(body_vec, q1)
+# Coordinate transform
+ned = np.array([1.0, 2.0, 3.0])
+enu = mql.ned_to_enu(ned)
+print(f"NED {ned} -> ENU {enu}")
 ```
 
-### Geometric Controller
+For detailed Python documentation, see:
 
-```python
-import mini_quadlib as mql
-import numpy as np
-
-# Define current state
-current_state = mql.QuadrotorState(
-  position=np.array([0.0, 0.0, 0.0]),
-  velocity=np.array([0.0, 0.0, 0.0]),
-  attitude=mql.Quaternion.identity(),
-  angular_velocity=np.array([0.0, 0.0, 0.0])
-)
-
-# Define desired setpoint
-setpoint = mql.QuadrotorSetpoint(
-  position=np.array([1.0, 0.0, -1.0]),  # NED frame
-  velocity=np.array([0.0, 0.0, 0.0]),
-  acceleration=np.array([0.0, 0.0, 0.0]),
-  yaw=0.0
-)
-
-# Compute control
-control = mql.geometric_control(
-  current_state=current_state,
-  desired_setpoint=setpoint,
-  position_gains=np.array([1.0, 1.0, 2.0]),
-  velocity_gains=np.array([0.5, 0.5, 1.0]),
-  attitude_gains=np.array([1.0, 1.0, 1.0]),
-  angular_velocity_gains=np.array([0.1, 0.1, 0.1]),
-  mass=1.0,
-  inertia=np.array([0.01, 0.01, 0.02])
-)
-
-print(f"Control: thrust={control[0]:.2f}, moments={control[1:4]}")
-```
-
-### L1 Adaptive Control
-
-```python
-import mini_quadlib as mql
-import numpy as np
-
-# Initialize L1 state (do this once)
-l1_state = mql.L1AdaptiveState()
-
-# Quadrotor parameters
-mass = 1.0
-inertia = np.array([0.01, 0.01, 0.02])
-dt = 0.01  # 100 Hz
-
-# Control loop
-for i in range(100):
-  # Get baseline control from geometric controller
-  baseline_ctrl = mql.geometric_control(
-      current_state=current_state,
-      desired_setpoint=setpoint,
-      position_gains=np.array([1.0, 1.0, 2.0]),
-      velocity_gains=np.array([0.5, 0.5, 1.0]),
-      attitude_gains=np.array([1.0, 1.0, 1.0]),
-      angular_velocity_gains=np.array([0.1, 0.1, 0.1]),
-      mass=mass,
-      inertia=inertia
-  )
-  
-  # Update L1 adaptive control
-  l1_state = mql.l1_adaptive_control(
-      previous_state=l1_state,
-      current_velocity=current_state.velocity,
-      current_angular_velocity=current_state.angular_velocity,
-      current_attitude=current_state.attitude,
-      baseline_control=baseline_ctrl,
-      dt=dt,
-      As_v=10.0,
-      As_W=10.0,
-      lpf1_cutoff_freq_force=5.0,
-      lpf1_cutoff_freq_moment=5.0,
-      lpf2_cutoff_freq_moment=10.0,
-      mass=mass,
-      inertia=inertia
-  )
-  
-  # Get total augmented control
-  total_control = l1_state.get_total_control()
-  # Or: total_control = l1_state.baseline_control + l1_state.adaptive_control
-  
-  # Inspect disturbance estimates
-  print(f"Force disturbance estimate: {l1_state.force_disturbance_estimate}")
-  print(f"Moment disturbance estimate: {l1_state.moment_disturbance_estimate}")
-```
-
----
-
-## API Reference
-
-### Classes
-
-#### `Quaternion`
-
-Represents rotation as quaternion [w, x, y, z] (scalar-first convention).
-
-```python
-# Construction
-q = mql.Quaternion(w=1.0, x=0.0, y=0.0, z=0.0)
-q = mql.Quaternion.identity()
-q = mql.Quaternion.from_array(np.array([1, 0, 0, 0]))
-
-# Properties
-q.w, q.x, q.y, q.z  # Individual components
-
-# Methods
-q.normalize()       # Returns normalized quaternion
-q.conjugate()       # Returns conjugate
-q.to_array()        # Returns np.array([w, x, y, z])
-q.to_dict()         # Returns {'w': ..., 'x': ..., 'y': ..., 'z': ...}
-
-# Operators
-q1 * q2             # Hamilton product (non-commutative!)
-```
-
-#### `RotationMatrix`
-
-Represents rotation as 3x3 orthonormal matrix.
-
-```python
-# Construction
-R = mql.RotationMatrix()                    # Identity
-R = mql.RotationMatrix(np.eye(3))           # From numpy array
-R = mql.RotationMatrix.identity()
-R = mql.RotationMatrix.from_columns(colx, coly, colz)
-
-# Properties
-R.colx, R.coly, R.colz  # Column vectors (body axes in world frame)
-
-# Methods
-R.to_array()        # Returns 3x3 numpy array
-R.transpose()       # Returns transposed matrix
-R.inverse()         # Returns inverse (same as transpose for rotation)
-```
-
-#### `QuadrotorState`
-
-Current state of the quadrotor.
-
-```python
-state = mql.QuadrotorState(
-  position=np.array([x, y, z]),           # [m], NED frame
-  velocity=np.array([vx, vy, vz]),        # [m/s], NED frame
-  attitude=mql.Quaternion(...),           # Attitude quaternion
-  angular_velocity=np.array([wx, wy, wz]) # [rad/s], body frame
-)
-
-state.to_dict()  # Convert to dictionary
-```
-
-#### `QuadrotorSetpoint`
-
-Desired trajectory setpoint.
-
-```python
-setpoint = mql.QuadrotorSetpoint(
-  position=np.array([x, y, z]),           # [m]
-  velocity=np.array([vx, vy, vz]),        # [m/s]
-  acceleration=np.array([ax, ay, az]),    # [m/s²]
-  jerk=np.array([jx, jy, jz]),            # [m/s³]
-  snap=np.array([sx, sy, sz]),            # [m/s⁴]
-  yaw=0.0,                                # [rad]
-  yaw_dot=0.0,                            # [rad/s]
-  yaw_ddot=0.0                            # [rad/s²]
-)
-```
-
-#### `L1AdaptiveState`
-
-Internal state for L1 adaptive controller.
-
-```python
-l1_state = mql.L1AdaptiveState()
-
-# After calling l1_adaptive_control():
-l1_state.baseline_control           # Baseline control [f, Mx, My, Mz]
-l1_state.adaptive_control           # Adaptive correction
-l1_state.get_total_control()        # baseline + adaptive
-l1_state.force_disturbance_estimate # Estimated force disturbance
-l1_state.moment_disturbance_estimate # Estimated moment disturbance
-l1_state.to_dict()                  # Full state as dictionary
-```
-
-### Functions
-
-#### Controllers
-
-| Function | Description |
-|----------|-------------|
-| `geometric_control(...)` | SE(3) geometric controller, returns `[thrust, Mx, My, Mz]` |
-| `l1_adaptive_control(...)` | L1 adaptive augmentation, returns updated `L1AdaptiveState` |
-
-#### Coordinate Transforms
-
-| Function | Description |
-|----------|-------------|
-| `ned_to_enu(vec)` | Convert NED coordinates to ENU |
-| `enu_to_ned(vec)` | Convert ENU coordinates to NED |
-| `coordinate_transform(vec, from_frame, to_frame)` | General coordinate transform |
-
-#### Frame Transforms
-
-| Function | Description |
-|----------|-------------|
-| `transform_world_to_body(vec, attitude)` | Transform vector from world to body frame |
-| `transform_body_to_world(vec, attitude)` | Transform vector from body to world frame |
-
-#### Rotation Conversions
-
-| Function | Description |
-|----------|-------------|
-| `quaternion_to_rotation_matrix(q)` | Quaternion → RotationMatrix |
-| `rotation_matrix_to_quaternion(R)` | RotationMatrix → Quaternion |
-| `euler_to_rotation_matrix(euler)` | Euler angles [roll, pitch, yaw] → RotationMatrix |
-| `rotation_matrix_to_euler(R)` | RotationMatrix → Euler angles |
-
----
-
-## Features
-
-- **Pythonic API** - NumPy arrays, exceptions instead of error codes
-- **Type Safety** - Proper input validation with helpful error messages
-- **Efficient** - Thin wrapper over optimized C implementation
-- **Well Tested** - Comprehensive test suite covering all functions
-
-## Coordinate Frame
-
-All functions use **NED (North-East-Down)** coordinate frame:
-- X: North (forward)
-- Y: East (right)  
-- Z: Down
-
-Quaternion convention: **scalar-first** `[w, x, y, z]`
+📖 **[python/README.md](python/README.md)**
 
 ---
 
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Author
 

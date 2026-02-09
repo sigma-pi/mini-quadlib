@@ -15,14 +15,26 @@ import numpy as np
 def _find_library():
     """Locate the compiled C library"""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    lib_path = os.path.join(current_dir, '..', '..', 'build', 'libmini_quadlib.so')
     
-    if os.path.exists(lib_path):
-        return lib_path
+    search_paths = [
+        # 1. Installed package directory (pip install from PyPI)
+        os.path.join(current_dir, 'libmini_quadlib.so'),
+        # 2. Development mode (source tree)
+        os.path.join(current_dir, '..', '..', 'build', 'libmini_quadlib.so'),
+    ]
+    
+    # Environment variable override (highest priority)
+    env_lib = os.environ.get('MINI_QUADLIB_LIB')
+    if env_lib:
+        search_paths.insert(0, env_lib)
+    
+    for path in search_paths:
+        if os.path.exists(path):
+            return os.path.abspath(path)
     
     raise FileNotFoundError(
-        "Could not find libmini_quadlib.so. "
-        "Please build it first with: ./build_python.sh"
+        "Could not find libmini_quadlib.so.\n"
+        "Build from source: cd build && cmake .. -DBUILD_PYTHON=ON && make"
     )
 
 # Load the library

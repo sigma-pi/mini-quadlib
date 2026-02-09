@@ -1,26 +1,29 @@
 Metadata-Version: 2.4
 Name: mini-quadlib
 Version: 0.1.2
-Summary: Python bindings for mini-quadlib: A C library for quadrotor control (Linux)
+Summary: Python bindings for mini-quadlib: A lightweight C library for quadrotor control
 Author-email: Chengyu Yang <chengyuy520@gmail.com>
 License: MIT
 Project-URL: Homepage, https://github.com/sigma-pi/mini-quadlib
 Project-URL: Repository, https://github.com/sigma-pi/mini-quadlib
+Project-URL: Documentation, https://github.com/sigma-pi/mini-quadlib#readme
 Project-URL: Issues, https://github.com/sigma-pi/mini-quadlib/issues
-Keywords: robotics,quadrotor,control,aerospace
-Classifier: Development Status :: 3 - Alpha
+Keywords: robotics,quadrotor,drone,control,aerospace,geometric-control,L1-adaptive
+Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
 Classifier: Intended Audience :: Science/Research
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: POSIX :: Linux
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: C
 Classifier: Topic :: Scientific/Engineering
-Requires-Python: >=3.7
+Classifier: Topic :: Scientific/Engineering :: Physics
+Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: numpy>=1.19.0
