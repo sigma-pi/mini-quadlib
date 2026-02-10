@@ -3,7 +3,7 @@ name: Build and Publish to PyPI
 on:
   release:
     types: [published]
-  workflow_dispatch:  # Allow manual trigger for testing
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,19 +11,19 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64
     
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
+          # manylinux container uses yum
+          yum install -y cmake make gcc gcc-c++
+          
+          # Use Python 3.11 from manylinux
+          export PATH="/opt/python/cp311-cp311/bin:$PATH"
           python -m pip install --upgrade pip build
 
       - name: Build C library
@@ -33,6 +33,9 @@ jobs:
           cmake .. -DBUILD_PYTHON=ON
           make -j$(nproc)
           ls -la libmini_quadlib.so
+          
+          # Verify GLIBC version requirement
+          objdump -T libmini_quadlib.so | grep GLIBC | head -5
 
       - name: Copy .so to package
         run: |
@@ -41,8 +44,10 @@ jobs:
 
       - name: Build wheel
         run: |
+          export PATH="/opt/python/cp311-cp311/bin:$PATH"
           cd python
           python -m build
+          
           # Verify .so is in wheel
           unzip -l dist/*.whl | grep .so
 
@@ -58,7 +63,7 @@ jobs:
     if: github.event_name == 'release'
     
     permissions:
-      id-token: write  # Required for trusted publishing
+      id-token: write
 
     environment:
       name: pypi
