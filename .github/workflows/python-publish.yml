@@ -33,9 +33,6 @@ jobs:
           cmake .. -DBUILD_PYTHON=ON
           make -j$(nproc)
           ls -la libmini_quadlib.so
-          
-          # Verify GLIBC version requirement
-          objdump -T libmini_quadlib.so | grep GLIBC | head -5
 
       - name: Copy .so to package
         run: |
