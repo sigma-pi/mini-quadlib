@@ -530,7 +530,7 @@ def get_version() -> str:
             return version_bytes.decode('utf-8')
         except Exception:
             pass
-    return "0.1.2"  # fallback
+    return "0.2.0"  # fallback
 
 # =============================================================================
 # CORE CONTROLLER FUNCTIONS

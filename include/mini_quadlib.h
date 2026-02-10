@@ -22,7 +22,7 @@ extern "C" {
  * @file mini_quadlib.h
  * @brief Mini-QuadLib - Simple quadrotor control library
  * @author Chengyu Yang
- * @version 0.1.2
+ * @version 0.2.0
  * @date 2026
  * 
  * This library provides the geometric controller for quadrotor control,
@@ -33,7 +33,7 @@ extern "C" {
 // VERSION INFO
 // =============================================================================
 
-#define QUADLIB_VERSION_STRING "0.1.2"
+#define QUADLIB_VERSION_STRING "0.2.0"
 
 /*
 Return the version string of the mini-quadlib library as char* ended with '\0'.

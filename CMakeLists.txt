@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mini_quadlib VERSION 0.1.2 LANGUAGES C)
+project(mini_quadlib VERSION 0.2.0 LANGUAGES C)
 
 # Options
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
