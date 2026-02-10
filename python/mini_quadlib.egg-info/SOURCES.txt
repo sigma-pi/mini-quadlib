@@ -5,10 +5,8 @@ pyproject.toml
 setup.py
 ../LICENSE
 ../README.md
-../include/mini_quadlib.h
 mini_quadlib/__init__.py
 mini_quadlib/core.py
-mini_quadlib/libmini_quadlib.so
 mini_quadlib/py.typed
 mini_quadlib.egg-info/PKG-INFO
 mini_quadlib.egg-info/SOURCES.txt
