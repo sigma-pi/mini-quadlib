@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mini-quadlib"
-version = "0.1.2"
+version = "0.1.2.glibc228"
 description = "Python bindings for mini-quadlib: A lightweight C library for quadrotor control"
 readme = "README.md"
 requires-python = ">=3.8"
