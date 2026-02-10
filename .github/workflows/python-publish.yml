@@ -19,10 +19,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          # manylinux container uses yum
           yum install -y cmake make gcc gcc-c++
-          
-          # Use Python 3.11 from manylinux
           export PATH="/opt/python/cp311-cp311/bin:$PATH"
           python -m pip install --upgrade pip build
 
@@ -32,21 +29,18 @@ jobs:
           cd build
           cmake .. -DBUILD_PYTHON=ON
           make -j$(nproc)
-          ls -la libmini_quadlib.so
 
       - name: Copy .so to package
-        run: |
-          cp build/libmini_quadlib.so python/mini_quadlib/
-          ls -la python/mini_quadlib/
+        run: cp build/libmini_quadlib.so python/mini_quadlib/
 
       - name: Build wheel
         run: |
           export PATH="/opt/python/cp311-cp311/bin:$PATH"
           cd python
           python -m build
-          
-          # Verify .so is in wheel
-          unzip -l dist/*.whl | grep .so
+
+      - name: Verify wheel contents
+        run: unzip -l python/dist/*.whl
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
