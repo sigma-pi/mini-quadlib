@@ -17,30 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Build
         run: |
-          yum install -y cmake make gcc gcc-c++
-          export PATH="/opt/python/cp311-cp311/bin:$PATH"
-          python -m pip install --upgrade pip build
-
-      - name: Build C library
-        run: |
-          mkdir -p build
-          cd build
+          yum install -y cmake make gcc
+          mkdir build && cd build
           cmake .. -DBUILD_PYTHON=ON
-          make -j$(nproc)
+          make
+          cp libmini_quadlib.so ../python/mini_quadlib/
 
-      - name: Copy .so to package
-        run: cp build/libmini_quadlib.so python/mini_quadlib/
-
-      - name: Build wheel
+      - name: Package
         run: |
           export PATH="/opt/python/cp311-cp311/bin:$PATH"
+          pip install build
           cd python
           python -m build
-
-      - name: Verify wheel contents
-        run: unzip -l python/dist/*.whl
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -52,20 +42,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'release'
-    
     permissions:
       id-token: write
-
     environment:
       name: pypi
       url: https://pypi.org/p/mini-quadlib
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
