@@ -4,6 +4,16 @@ A lightweight C library for quadrotor control systems, with Python bindings.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## References
+
+The geometric controller and L1 adaptive controller in this library are designed based on the following publication:
+
+> **L1Quad: L1 Adaptive Augmentation of Geometric Control for Agile Quadrotors With Performance Guarantees**
+> Published in: *IEEE Transactions on Control Systems Technology*, Volume: 33, Issue: 2, March 2025
+> [IEEE Xplore](https://ieeexplore.ieee.org/document/10820973)
+
+An open-source implementation running both controllers on real drones using the ArduPilot platform is available at: [sigma-pi/L1Quad](https://github.com/sigma-pi/L1Quad)
+
 ## Features
 
 - **Geometric Controller** - SE(3) geometric control for quadrotors
